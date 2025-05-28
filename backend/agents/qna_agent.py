@@ -7,7 +7,6 @@ import os
 from datetime import datetime
 from langchain.schema import Document
 
-from langgraph.graph import agent_node
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -26,8 +25,6 @@ vector_store = PineconeVectorStore(
     embedding=embeddings,
     namespace="lecturedata"
 )
-
-@agent_node
 
 def answer_from_vectorstore(state):
     user_query = state["user_query"]

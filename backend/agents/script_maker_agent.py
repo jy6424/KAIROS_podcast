@@ -31,14 +31,20 @@ def read_prompt(filename):
         return f.read().strip()
 
 #if not related QA found, return empty list
-def get_qa_docs_with_fallback(query, k, namespace):
+def get_qa_docs_with_fallback(query, k, namespace, score_threshold=0.01):
     try:
-        docs = vector_store.similarity_search(query, k=k, namespace=namespace)
-        if docs:
-            return docs
+        docs_and_scores = vector_store.similarity_search_with_score(
+            query, k=k, namespace=namespace
+        )
+        filtered_docs = [
+            doc for doc, score in docs_and_scores if score >= score_threshold
+        ]
+
+        if filtered_docs:
+            return filtered_docs
         else:
-            # Fallback: If no documents found, return a default message
             return []
+
     except Exception as e:
         print("에러 발생:", e)
         return []
@@ -56,7 +62,7 @@ def generate_script(state):
     qa = [doc.page_content for doc in qa_docs]
 
     # 2. Create user and system prompts
-    user_prompt = f"다음은 참고할 문서 내용입니다:\n\n{lecture}\n\n{qa} \n\n이 내용을 바탕으로 '{query}'에 대한 스크립트를 작성해주세요." 
+    user_prompt = f"다음은 참고할 문서 내용입니다:\n\n{lecture}\n\n{qa} \n\n이 내용을 바탕으로 스크립트를 작성해주세요." 
     system_prompt = read_prompt("summary_prompt.txt")
 
 
@@ -68,4 +74,4 @@ def generate_script(state):
         ],
         temperature=0.7
     )
-    return {"script": response.choices[0].message.content, "query": query}
+    return {"script": response.choices[0].message.content, "query": query, "lecture_docs": lecture, "qa_docs": qa}
