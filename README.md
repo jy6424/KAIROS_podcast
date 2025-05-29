@@ -7,6 +7,7 @@ last update : 2025-05-29
 RAG를 사용하기 위해 pinecone DB를 사용했습니다.
 FastAPI로 백엔드를 구축했습니다.
 
+현재 프론트엔드 개발중...
 
 MAS 워크플로우 : 
 
