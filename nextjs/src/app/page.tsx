@@ -1,103 +1,293 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { uploadPDF } from "./service/upload";
+import { generateContent } from "./service/generate";
+import { askQuestion } from "./service/query";
+
+export default function HomePage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [lectureName, setLectureName] = useState("");
+  const [lectureOptions, setLectureOptions] = useState<string[]>([]);
+  const [newLecture, setNewLecture] = useState("");
+
+  const [uploadResult, setUploadResult] = useState("");
+
+  const [initText, setInitText] = useState("");
+  const [generateResult, setGenerateResult] = useState("");
+  const [generateResultObj, setGenerateResultObj] = useState<any>(null);
+
+  const [question, setQuestion] = useState("");
+  const [answerResult, setAnswerResult] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isAsking, setIsAsking] = useState(false);
+
+  const addLecture = () => {
+    const trimmed = newLecture.trim();
+    if (trimmed && !lectureOptions.includes(trimmed)) {
+      const updated = [...lectureOptions, trimmed];
+      setLectureOptions(updated);
+      setNewLecture("");
+      localStorage.setItem("lectureOptions", JSON.stringify(updated));
+    }
+  };
+
+  const removeLecture = (lecture: string) => {
+    const updated = lectureOptions.filter((l) => l !== lecture);
+    setLectureOptions(updated);
+    if (lectureName === lecture) {
+      setLectureName("");
+      localStorage.removeItem("lectureName");
+    }
+    localStorage.setItem("lectureOptions", JSON.stringify(updated));
+  };
+
+  const handleLectureSelect = (value: string) => {
+    setLectureName(value);
+    localStorage.setItem("lectureName", value);
+  };
+
+  const handleUpload = async () => {
+    if (!file || !lectureName) return;
+    setIsUploading(true);
+    try {
+      const res = await uploadPDF(file, lectureName);
+      setUploadResult("done!");
+    } catch (err: any) {
+      setUploadResult("에러: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!initText) return;
+    setIsGenerating(true); // 시작 시 true
+    try {
+      const res = await generateContent(initText);
+      console.log("📦 generateContent 응답:", res);
+      setGenerateResult("아래에서 팟캐스트를 재생하세요!"); // ✅ 간단하게 Done 표시
+      setGenerateResultObj(res);
+    } catch (err: any) {
+      setGenerateResult("에러: " + err.message);
+      setGenerateResultObj(null);
+    } finally {
+      setIsGenerating(false); // 끝나면 false
+    }
+  };
+
+  const handleAsk = async () => {
+    if (!question) return;
+    setIsAsking(true); // 질문 시작
+    try {
+      const res = await askQuestion(question);
+      setAnswerResult(res.answer ?? "Done");
+    } catch (err: any) {
+      setAnswerResult("에러: " + err.message);
+    } finally {
+      setIsAsking(false); // 질문 끝
+    }
+  };
+
+  useEffect(() => {
+    const storedOptions = localStorage.getItem("lectureOptions");
+    const storedName = localStorage.getItem("lectureName");
+
+    if (storedOptions) {
+      try {
+        setLectureOptions(JSON.parse(storedOptions));
+      } catch (e) {
+        console.error("Invalid lectureOptions in localStorage");
+      }
+    }
+
+    if (storedName) {
+      setLectureName(storedName);
+    }
+  }, []);
+
+  useEffect(() => {
+    setGenerateResultObj({
+      audio_url: "/static/audio/podcast_script.mp3",
+    });
+  }, []);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="max-w-3xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-8 text-center">KAIROS Podcast</h1>
+      <h2 className="text-xl mb-6 text-center">
+        업로드한 강의 PDF를 바탕으로 팟캐스트 생성 및 질문할 수 있습니다.
+        <br />
+        질문은 다음 팟캐스트에 반영됩니다!
+      </h2>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      {/* 1. PDF 업로드 */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold mb-4">강의PDF 업로드</h2>
+        <div className="space-y-4">
+          {/* 파일 선택 */}
+          <label className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 cursor-pointer transition">
+            파일 선택
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="hidden"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </label>
+          {file && (
+            <p className="text-sm text-gray-600">선택된 파일: {file.name}</p>
+          )}
+
+          {/* Lecture name 입력 및 선택 */}
+          {/* 드롭다운 + 삭제 버튼 */}
+          <div className="flex items-center gap-2">
+            <select
+              value={lectureName}
+              onChange={(e) => {
+                setLectureName(e.target.value);
+                localStorage.setItem("lectureName", e.target.value);
+              }}
+              className="flex-grow px-3 py-2 border rounded-md"
+            >
+              <option value="">
+                {lectureOptions.length === 0
+                  ? "추가된 강의가 없습니다"
+                  : "강의를 선택하세요"}
+              </option>
+              {lectureOptions.map((lecture) => (
+                <option key={lecture} value={lecture}>
+                  {lecture}
+                </option>
+              ))}
+            </select>
+
+            {lectureName && (
+              <button
+                onClick={() => {
+                  const updated = lectureOptions.filter(
+                    (l) => l !== lectureName
+                  );
+                  setLectureOptions(updated);
+                  setLectureName("");
+                  localStorage.setItem(
+                    "lectureOptions",
+                    JSON.stringify(updated)
+                  );
+                  localStorage.removeItem("lectureName");
+                }}
+                className="text-red-500 hover:text-red-700 text-sm font-semibold border border-red-300 px-3 py-2 rounded-md"
+              >
+                삭제
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="새 Lecture 추가"
+              value={newLecture}
+              onChange={(e) => setNewLecture(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault(); // 폼 submit 방지
+                  addLecture(); // 엔터로 강의 추가
+                }
+              }}
+              className="px-3 py-2 border rounded-md w-full"
+            />
+            <button
+              onClick={addLecture}
+              className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 transition whitespace-nowrap"
+            >
+              추가
+            </button>
+          </div>
+
+          <button
+            onClick={handleUpload}
+            disabled={isUploading}
+            className={`${
+              isUploading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            } text-white px-4 py-2 rounded-md transition`}
           >
-            Read our docs
-          </a>
+            {isUploading ? "업로드 중..." : "업로드"}
+          </button>
+
+          <pre className="bg-gray-100 p-3 rounded whitespace-pre-wrap">
+            {uploadResult}
+          </pre>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </section>
+      {/* 2. 콘텐츠 생성 */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold mb-4">팟캐스트</h2>
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="init 입력"
+            value={initText}
+            onChange={(e) => setInitText(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className={`${
+              isGenerating
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            } text-white px-4 py-2 rounded-md transition`}
+          >
+            {isGenerating ? "생성 중..." : "생성하기"}
+          </button>
+
+          <pre className="bg-gray-100 p-3 rounded whitespace-pre-wrap">
+            {generateResult}
+          </pre>
+
+          {generateResultObj?.audio_url && (
+            <div>
+              <audio
+                controls
+                src={`http://localhost:8000${generateResultObj.audio_url}`}
+                className="mt-2 w-full"
+              />
+            </div>
+          )}
+        </div>
+      </section>
+      {/* 3. 질문 */}
+      <section>
+        <h2 className="text-xl font-semibold mb-4">질문하기</h2>
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="질문 입력"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md"
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <button
+            onClick={handleAsk}
+            disabled={isAsking}
+            className={`${
+              isAsking
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            } text-white px-4 py-2 rounded-md transition`}
+          >
+            {isAsking ? "질문 중..." : "질문"}
+          </button>
+          <pre className="bg-gray-100 p-3 rounded whitespace-pre-wrap">
+            {answerResult}
+          </pre>
+        </div>
+      </section>
+    </main>
   );
 }

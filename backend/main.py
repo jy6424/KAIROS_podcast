@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Request, Query, Form
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import tempfile
 import os
 from agents.pdf_read_agent import summarize_and_store
@@ -9,6 +10,8 @@ from langfuse.decorators import observe
 from dotenv import load_dotenv
 from agents.orchestration_agent import graph
 import os
+from fastapi.staticfiles import StaticFiles
+
 
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -20,6 +23,15 @@ load_dotenv()
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # 프론트 주소
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.post("/process-pdf")
 @observe(name="process_pdf")

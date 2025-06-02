@@ -28,6 +28,7 @@ class ChatState(TypedDict):
     lecture_docs: Optional[str]
     script: Optional[str]
     audio_file: Optional[str]
+    audio_url: Optional[str]
     qa_docs: Optional[str]
     answer: Optional[str]
 
@@ -40,7 +41,7 @@ def script_generation(state: ChatState) -> ChatState:
 
 def tts_generation(state: ChatState) -> ChatState:
     tts_result = synthesize_tts(state)
-    return {**state, "audio_file": tts_result["audio_file"]}
+    return {**state, "audio_file": tts_result["audio_file"], "audio_url": tts_result["audio_url"]}
 
 def save_to_vector_store(state: ChatState) -> None:
     user_qna_data = answer_from_vectorstore(state)
